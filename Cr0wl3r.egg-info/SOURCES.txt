@@ -1,0 +1,10 @@
+Cr0wl3r.py
+LICENSE.txt
+MANIFEST.in
+README.md
+setup.py
+Cr0wl3r.egg-info/PKG-INFO
+Cr0wl3r.egg-info/SOURCES.txt
+Cr0wl3r.egg-info/dependency_links.txt
+Cr0wl3r.egg-info/entry_points.txt
+Cr0wl3r.egg-info/top_level.txt
