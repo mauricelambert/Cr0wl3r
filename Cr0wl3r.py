@@ -96,7 +96,7 @@ script src https://github.githubassets.com/assets/environment-de3997b81651.js
 #    along with this program.  If not, see <https://www.gnu.org/licenses/>.
 ###################
 
-__version__ = "0.0.2"
+__version__ = "0.0.3"
 __author__ = "Maurice Lambert"
 __author_email__ = "mauricelambert434@gmail.com"
 __maintainer__ = "Maurice Lambert"
@@ -825,6 +825,7 @@ def main() -> int:
             cookies += ";"
         cookies += ";".join(arguments.cookie)
 
+    context = create_default_context()
     if selenium:
         global driver
         options = ChromeOptions()
@@ -836,8 +837,6 @@ def main() -> int:
         driver = Chrome(options=options)
     elif arguments.insecure:
         context = _create_unverified_context()
-    else:
-        context = create_default_context()
 
     copy: CrawlerPrinter = CrawlerPrinter(
         arguments.url,
