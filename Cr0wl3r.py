@@ -96,7 +96,7 @@ script src https://github.githubassets.com/assets/environment-de3997b81651.js
 #    along with this program.  If not, see <https://www.gnu.org/licenses/>.
 ###################
 
-__version__ = "0.0.1"
+__version__ = "0.0.2"
 __author__ = "Maurice Lambert"
 __author_email__ = "mauricelambert434@gmail.com"
 __maintainer__ = "Maurice Lambert"
@@ -121,6 +121,7 @@ __all__ = ["_Crawler", "CrawlerPrinter", "main", "CriticalUrllibError", "Content
 
 print(copyright)
 
+from ssl import create_default_context, _create_unverified_context, SSLContext
 from logging import basicConfig, debug, info, warning, error, critical
 from typing import Union, Set, List, Dict, Tuple, TypeVar
 from http.client import HTTPResponse, IncompleteRead
@@ -315,9 +316,11 @@ class _Crawler(ABC):
         headers: Dict[str, str] = {},
         robots: bool = True,
         sitemap: bool = True,
+        context: SSLContext = create_default_context(),
     ):
         self.counter = 1
         self.robots = robots
+        self.context = context
         self.sitemap = sitemap
         self.headers = headers
         self.html: bytes = None
@@ -417,7 +420,7 @@ class _Crawler(ABC):
         """
 
         if isinstance(data, str):
-            data = self.get_data(data)
+            data = self.get_data(urlparse(data))
             if data is None:
                 return None
 
@@ -687,6 +690,13 @@ def parse_args() -> Namespace:
         help="Crawl URLs recursively.",
     )
     add(
+        "--insecure",
+        "-i",
+        default=False,
+        action="store_true",
+        help="Use insecure SSL (support selenium and urllib)",
+    )
+    add(
         "--do-not-request-robots",
         "--no-robots",
         "-R",
@@ -821,7 +831,13 @@ def main() -> int:
         options.add_experimental_option("excludeSwitches", ["enable-logging"])
         if arguments.no_gui:
             options.add_argument("--headless=new")
+        if arguments.insecure:
+            options.add_argument('ignore-certificate-errors')
         driver = Chrome(options=options)
+    elif arguments.insecure:
+        context = _create_unverified_context()
+    else:
+        context = create_default_context()
 
     copy: CrawlerPrinter = CrawlerPrinter(
         arguments.url,
@@ -831,6 +847,7 @@ def main() -> int:
         only_domain=not arguments.not_only_domain,
         robots=not arguments.do_not_request_robots,
         sitemap=not arguments.do_not_request_sitemap,
+        context=context,
     )
 
     try:
