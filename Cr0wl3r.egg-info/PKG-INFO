@@ -1,6 +1,6 @@
 Metadata-Version: 2.1
 Name: Cr0wl3r
-Version: 0.0.3
+Version: 1.0.0
 Summary: This module implements a crawler to find all links and resources
 Home-page: https://github.com/mauricelambert/Cr0wl3r
 Author: Maurice Lambert
@@ -36,7 +36,9 @@ License-File: LICENSE.txt
 
 ## Description
 
-This package implements a web crawler to find all visible URLs in the page and sort URL by dynamic content (useful for pentest and hacking).
+This package implements a web discreet crawler to find all visible URLs on a website, this crawler can store pages (and reuse them for next crawl), scan web content for dynamic content (useful for pentest, red teaming and hacking), create a full JSON report and database to reuse the analysis, try to identify web pages, static content and assets to request only what is useful.
+
+> The name *Cr0wl3r* is a pun with *Crawler* and *Growler* because this tool in not offensive but it's the first step to attack a web server.
 
 ## Requirements
 
@@ -68,42 +70,69 @@ chmod u+x Cr0wl3r.pyz
 python3 -m Cr0wl3r https://github.com/mauricelambert
 
 # Entry point (console)
-Cr0wl3r -F report.json -l DEBUG -f logs.log -R -S -d -c "cookie=foobar" -H "User-Agent:Chrome" -m 3 -t p -r https://github.com/mauricelambert
+Cr0wl3r -F report.json -L DEBUG -l logs.log -R -S -d -c "mycookie=foobar" -H "User-Agent:Chrome" -m 3 -t "p" -r https://github.com/mauricelambert
+Cr0wl3r -R -S -C -d -u -i -F report.json -L DEBUG -l logs.log -c "mycookie=foobar" "session=abc" -c "counter=5" -H "User-Agent:Chrome" "Api-Key:myapikey" -H "Authorization:Basic QWxhZGRpbjpvcGVuIHNlc2FtZQ==" -m 5 -t "p" "img" -t "link" -I 3.5 -f "raw-url-only" -D4 "text/html" -r https://github.com/mauricelambert
 ```
 
 ### Python3
 
 ```python
-from Cr0wl3r import CrawlerPrinter
-from logging import basicConfig
+from Cr0wl3r import CrawlerRawPrinter
 
-basicConfig(level=1)
-
-cr0wl3r = CrawlerPrinter(
+CrawlerRawPrinter(
     "https://github.com/mauricelambert",
-    recursive = False,
-    max_request = None,
-    only_domain = True,
-    headers = {},
-    robots = True,
-    sitemap = True,
-)
-cr0wl3r.crawl()
+    recursive=False,
+).crawl()
 ```
 
 ```python
-from Cr0wl3r import _Crawler
+from ssl import _create_unverified_context
+from Cr0wl3r import _Crawler, reports
+from logging import basicConfig
+from typing import Union
+
+basicConfig(level=1)
 
 class CustomCr0wl3r(_Crawler):
-    def handle(self, url: str, *sources: str) -> None:
-        print("[+] New url:", url, "from", *sources)
-        print("[*] Getted in", self.urls_parsed[-1])
+    def handle_web_page(
+        self, from_url: str, url: str, tag: str, attribute: str
+    ) -> Union[bool, None]:
+
+        print("[+] New web page:", url, "from", from_url, f"{tag}<{attribute}>")
         print("[*] There are still", len(self.urls_to_parse), "requests to send.")
 
-cr0wl3r = CustomCr0wl3r("https://github.com/mauricelambert", recursive=False)
+    def handle_static(
+        self, from_url: str, url: str, tag: str, attribute: str
+    ) -> Union[bool, None]:
+
+        print("[+] New static:", url, "from", from_url, f"{tag}<{attribute}>")
+        print("[*] There are still", len(self.urls_to_parse), "requests to send.")
+
+    def handle_resource(
+        self, from_url: str, url: str, tag: str, attribute: str
+    ) -> Union[bool, None]:
+
+        print("[+] New assets:", url, "from", from_url, f"{tag}<{attribute}>")
+        print("[*] There are still", len(self.urls_to_parse), "requests to send.")
+
+cr0wl3r = CustomCr0wl3r(
+    "https://github.com/mauricelambert",
+    recursive=True,
+    update=True,
+    max_request=10,
+    only_domain=False,
+    headers={"User-Agent": "Chrome", "Cookie": "mycookie=abc"},
+    robots=False,
+    sitemap=False,
+    crossdomain=False,
+    context=_create_unverified_context(),
+    interval=3.5,
+    download_policy="do not download",
+)
 cr0wl3r.crawl()
+
 with open("urls.txt", 'w') as report:
-    [report.write(url + '\n') for url in cr0wl3r.urls_getted]
+    [report.write(url + '\n') for url in reports]
 ```
 
 ## Links
@@ -117,9 +146,11 @@ with open("urls.txt", 'w') as report:
 
 ```text
 ~# python3 Cr0wl3r.py -h
-usage: Cr0wl3r.py [-h] [--recursive] [--do-not-request-robots] [--do-not-request-sitemap] [--not-only-domain] [--max-request MAX_REQUEST]
-                  [--cookie COOKIE] [--headers HEADERS [HEADERS ...]] [--tags-counter TAGS_COUNTER [TAGS_COUNTER ...]] [--report-filename REPORT_FILENAME]
-                  [--loglevel {DEBUG,ERROR,CRITICAL,WARNING,INFO}] [--logfile LOGFILE] [--no-gui] [--script SCRIPT]
+usage: Cr0wl3r.py [-h] [--recursive] [--update] [--insecure] [--do-not-request-robots] [--do-not-request-sitemap] [--do-not-request-crossdomain]
+                  [--not-only-domain] [--max-request MAX_REQUEST] [--cookie COOKIE] [--headers HEADERS [HEADERS ...]]
+                  [--tags-counter TAGS_COUNTER [TAGS_COUNTER ...]] [--report-filename REPORT_FILENAME] [--loglevel {WARNING,CRITICAL,DEBUG,INFO,ERROR}]
+                  [--logfile LOGFILE] [--interval-request INTERVAL_REQUEST] [--output-format {raw,colored,raw-only-url}]
+                  [--download-all | --download-html | --download-static | --download-resources | --download-by-content-type DOWNLOAD_BY_CONTENT_TYPE | --download-requested | --do-not-download]
                   url
 
 This script crawls web site and prints URLs.
@@ -130,10 +161,14 @@ positional arguments:
 options:
   -h, --help            show this help message and exit
   --recursive, -r       Crawl URLs recursively.
+  --update, -u          Re-downloads and overwrites responses from requests made during previous crawls.
+  --insecure, -i        Use insecure SSL (support selenium and urllib)
   --do-not-request-robots, --no-robots, -R
                         Don't search, request and parse robots.txt
   --do-not-request-sitemap, --no-sitemap, -S
                         Don't search, request and parse sitemap.xml
+  --do-not-request-crossdomain, --no-crossdomain, -C
+                        Don't search, request and parse crossdomain.xml
   --not-only-domain, -d
                         Do not request only the base URL domain (request all domains).
   --max-request MAX_REQUEST, -m MAX_REQUEST
@@ -146,13 +181,28 @@ options:
                         Add a tag counter for scoring.
   --report-filename REPORT_FILENAME, --report REPORT_FILENAME, -F REPORT_FILENAME
                         The JSON report filename.
-  --loglevel {DEBUG,ERROR,CRITICAL,WARNING,INFO}, -l {DEBUG,ERROR,CRITICAL,WARNING,INFO}
+  --loglevel {WARNING,CRITICAL,DEBUG,INFO,ERROR}, -L {WARNING,CRITICAL,DEBUG,INFO,ERROR}
                         WebSiteCloner logs level.
-  --logfile LOGFILE, -f LOGFILE
+  --logfile LOGFILE, -l LOGFILE
                         WebCrawler logs file.
-  --no-gui, -g          Don't use GUI for selenium, sometime Web Page doesn't respond correctly.
-  --script SCRIPT, -s SCRIPT
-                        A javascript script you want to run on the page, to wait a specific element created by javascript.
+  --interval-request INTERVAL_REQUEST, --interval INTERVAL_REQUEST, -I INTERVAL_REQUEST
+                        Interval between each requests by domain.
+  --output-format {raw,colored,raw-only-url}, --format {raw,colored,raw-only-url}, -f {raw,colored,raw-only-url}
+                        Output format.
+  --download-all, --download, -D, -D0
+                        Download (store) all responses
+  --download-html, --dh, -D1
+                        Download (store) only HTML responses
+  --download-static, --ds, -D2
+                        Download (store) only static files (HTML, CSS, JavaScript)
+  --download-resources, --dr, -D3
+                        Download (store) only resources files (images, documents, icon...)
+  --download-by-content-type DOWNLOAD_BY_CONTENT_TYPE, --dct DOWNLOAD_BY_CONTENT_TYPE, -D4 DOWNLOAD_BY_CONTENT_TYPE
+                        Download (store) only responses with Content-Type that contains this value
+  --download-requested, --dR, -D5
+                        Download all requests responses and try to requests only Web page
+  --do-not-download, --dN, -D6
+                        Try to requests only Web page and do not download
 ~# 
 ```
 
