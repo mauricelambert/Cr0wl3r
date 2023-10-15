@@ -108,7 +108,8 @@ with open("urls.txt", 'w') as report:
  - [Github Page](https://github.com/mauricelambert/Cr0wl3r)
  - [Pypi](https://pypi.org/project/Cr0wl3r/)
  - [Documentation](https://mauricelambert.github.io/info/python/security/Cr0wl3r.html)
- - [Executable](https://mauricelambert.github.io/info/python/security/Cr0wl3r.pyz)
+ - [Python Executable](https://mauricelambert.github.io/info/python/security/Cr0wl3r.pyz)
+ - [Windows Python Executable](https://mauricelambert.github.io/info/python/security/Cr0wl3r.exe)
 
 ## Help
 
