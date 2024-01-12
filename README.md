@@ -1,4 +1,4 @@
-![Cr0wl3r logo](https://mauricelambert.github.io/info/python/security/Cr0wl3r_small.png "Cr0wl3r logo")
+![Cr0wl3r logo](https://mauricelambert.github.io/info/python/security/Cr0wl3r_small2.png "Cr0wl3r logo")
 
 # Cr0wl3r
 
