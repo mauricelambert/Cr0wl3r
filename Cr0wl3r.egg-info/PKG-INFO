@@ -1,6 +1,6 @@
 Metadata-Version: 2.1
 Name: Cr0wl3r
-Version: 1.0.1
+Version: 1.1.0
 Summary: This module implements a crawler to find all links and resources
 Home-page: https://github.com/mauricelambert/Cr0wl3r
 Author: Maurice Lambert
@@ -42,11 +42,13 @@ This package implements a web discreet crawler to find all visible URLs on a web
 
 ## Requirements
 
-This package require: 
+This package require:
+
  - python3
  - python3 Standard Library
 
 Optional:
+
  - Selenium
 
 ## Installation
@@ -71,7 +73,7 @@ python3 -m Cr0wl3r https://github.com/mauricelambert
 
 # Entry point (console)
 Cr0wl3r -F report.json -L DEBUG -l logs.log -R -S -d -c "mycookie=foobar" -H "User-Agent:Chrome" -m 3 -t "p" -r https://github.com/mauricelambert
-Cr0wl3r -R -S -C -d -u -i -F report.json -L DEBUG -l logs.log -c "mycookie=foobar" "session=abc" -c "counter=5" -H "User-Agent:Chrome" "Api-Key:myapikey" -H "Authorization:Basic QWxhZGRpbjpvcGVuIHNlc2FtZQ==" -m 5 -t "p" "img" -t "link" -I 3.5 -f "raw-url-only" -D4 "text/html" -r https://github.com/mauricelambert
+Cr0wl3r -R -S -C -d -u -i -F report.json -L DEBUG -l logs.log -c "mycookie=foobar" "session=abc" -c "counter=5" -H "User-Agent:Chrome" "Api-Key:myapikey" -H "Authorization:Basic QWxhZGRpbjpvcGVuIHNlc2FtZQ==" -m 5 -t "p" "img" -t "link" -I 3.5 -f "raw-url-only" -D4 "text/html" -q -r https://github.com/mauricelambert
 ```
 
 ### Python3
@@ -128,6 +130,7 @@ cr0wl3r = CustomCr0wl3r(
     context=_create_unverified_context(),
     interval=3.5,
     download_policy="do not download",
+    no_query_page=False,
 )
 cr0wl3r.crawl()
 
@@ -146,13 +149,12 @@ with open("urls.txt", 'w') as report:
 ## Help
 
 ```text
-~# python3 Cr0wl3r.py -h
-usage: Cr0wl3r.py [-h] [--recursive] [--update] [--insecure] [--do-not-request-robots] [--do-not-request-sitemap] [--do-not-request-crossdomain]
-                  [--not-only-domain] [--max-request MAX_REQUEST] [--cookie COOKIE] [--headers HEADERS [HEADERS ...]]
-                  [--tags-counter TAGS_COUNTER [TAGS_COUNTER ...]] [--report-filename REPORT_FILENAME] [--loglevel {WARNING,CRITICAL,DEBUG,INFO,ERROR}]
-                  [--logfile LOGFILE] [--interval-request INTERVAL_REQUEST] [--output-format {raw,colored,raw-only-url}]
-                  [--download-all | --download-html | --download-static | --download-resources | --download-by-content-type DOWNLOAD_BY_CONTENT_TYPE | --download-requested | --do-not-download]
-                  url
+~# Cr0wl3r --help
+usage: Cr0wl3r [-h] [--recursive] [--update] [--insecure] [--do-not-request-robots] [--do-not-request-sitemap] [--do-not-request-crossdomain] [--not-only-domain] [--max-request MAX_REQUEST] [--cookies COOKIES [COOKIES ...]]
+               [--headers HEADERS [HEADERS ...]] [--dynamic-tags-counter DYNAMIC_TAGS_COUNTER [DYNAMIC_TAGS_COUNTER ...]] [--report-filename REPORT_FILENAME] [--loglevel {DEBUG,INFO,REQUEST,WARNING,ERROR,CRITICAL}] [--logfile LOGFILE]
+               [--interval-request INTERVAL_REQUEST] [--output-format {raw-url-only,colored,raw}] [--no-query-page]
+               [--download-all | --download-html | --download-static | --download-resources | --download-by-content-type DOWNLOAD_BY_CONTENT_TYPE | --download-requested | --do-not-download]
+               url
 
 This script crawls web site and prints URLs.
 
@@ -174,22 +176,24 @@ options:
                         Do not request only the base URL domain (request all domains).
   --max-request MAX_REQUEST, -m MAX_REQUEST
                         Maximum request to perform.
-  --cookie COOKIE, -c COOKIE
+  --cookies COOKIES [COOKIES ...], -c COOKIES [COOKIES ...]
                         Add a cookie.
   --headers HEADERS [HEADERS ...], -H HEADERS [HEADERS ...]
                         Add headers.
-  --tags-counter TAGS_COUNTER [TAGS_COUNTER ...], --tags TAGS_COUNTER [TAGS_COUNTER ...], -t TAGS_COUNTER [TAGS_COUNTER ...]
+  --dynamic-tags-counter DYNAMIC_TAGS_COUNTER [DYNAMIC_TAGS_COUNTER ...], --tags-counter DYNAMIC_TAGS_COUNTER [DYNAMIC_TAGS_COUNTER ...], --tags DYNAMIC_TAGS_COUNTER [DYNAMIC_TAGS_COUNTER ...], -t DYNAMIC_TAGS_COUNTER [DYNAMIC_TAGS_COUNTER ...]
                         Add a tag counter for scoring.
   --report-filename REPORT_FILENAME, --report REPORT_FILENAME, -F REPORT_FILENAME
                         The JSON report filename.
-  --loglevel {WARNING,CRITICAL,DEBUG,INFO,ERROR}, -L {WARNING,CRITICAL,DEBUG,INFO,ERROR}
-                        WebSiteCloner logs level.
+  --loglevel {DEBUG,INFO,REQUEST,WARNING,ERROR,CRITICAL}, -L {DEBUG,INFO,REQUEST,WARNING,ERROR,CRITICAL}
+                        WebCrawler logs level.
   --logfile LOGFILE, -l LOGFILE
                         WebCrawler logs file.
   --interval-request INTERVAL_REQUEST, --interval INTERVAL_REQUEST, -I INTERVAL_REQUEST
                         Interval between each requests by domain.
-  --output-format {raw,colored,raw-only-url}, --format {raw,colored,raw-only-url}, -f {raw,colored,raw-only-url}
+  --output-format {raw-url-only,colored,raw}, --format {raw-url-only,colored,raw}, -f {raw-url-only,colored,raw}
                         Output format.
+  --no-query-page, --no-query, -q
+                        Request only when path is different, without this option the same path will be requested for each differents queries.
   --download-all, --download, -D, -D0
                         Download (store) all responses
   --download-html, --dh, -D1
@@ -204,6 +208,7 @@ options:
                         Download all requests responses and try to requests only Web page
   --do-not-download, --dN, -D6
                         Try to requests only Web page and do not download
+
 ~# 
 ```
 

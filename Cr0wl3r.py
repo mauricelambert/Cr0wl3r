@@ -4,7 +4,7 @@
 ###################
 #    This module implements a crawler to find all links and resources
 #    on the target web site.
-#    Copyright (C) 2023  Maurice Lambert
+#    Copyright (C) 2023, 2024  Maurice Lambert
 
 #    This program is free software: you can redistribute it and/or modify
 #    it under the terms of the GNU General Public License as published by
@@ -967,7 +967,7 @@ on the target web site.
 ~# 
 """
 
-__version__ = "1.0.1"
+__version__ = "1.1.0"
 __author__ = "Maurice Lambert"
 __author_email__ = "mauricelambert434@gmail.com"
 __maintainer__ = "Maurice Lambert"
@@ -980,7 +980,7 @@ license = "GPL-3.0 License"
 __url__ = "https://github.com/mauricelambert/Cr0wl3r"
 
 copyright = """
-Cr0wl3r  Copyright (C) 2023  Maurice Lambert
+Cr0wl3r  Copyright (C) 2023, 2024  Maurice Lambert
 This program comes with ABSOLUTELY NO WARRANTY.
 This is free software, and you are welcome to redistribute it
 under certain conditions.
@@ -1000,28 +1000,39 @@ __all__ = [
 
 print(copyright)
 
+from logging import (
+    basicConfig,
+    debug,
+    info,
+    warning,
+    error,
+    critical,
+    addLevelName,
+    log,
+)
 from ssl import create_default_context, _create_unverified_context, SSLContext
-from logging import basicConfig, debug, info, warning, error, critical
 from typing import Union, Set, List, Dict, Tuple, TypeVar, FrozenSet
 from os.path import dirname, basename, normpath, join, exists
 from urllib.parse import urlparse, ParseResult, quote
 from http.client import HTTPResponse, IncompleteRead
 from argparse import ArgumentParser, Namespace
+from sys import exit, stderr, path as sys_path
 from urllib.error import URLError, HTTPError
 from collections import defaultdict, Counter
 from urllib.request import urlopen, Request
 from xml.etree.ElementTree import parse
 from os import name, getcwd, makedirs
+from http.cookies import SimpleCookie
 from abc import ABC, abstractmethod
 from html.parser import HTMLParser
 from dataclasses import dataclass
 from shutil import copyfileobj
 from datetime import datetime
-from sys import exit, stderr
 from time import sleep, time
 from io import BytesIO
 from json import dump
 import logging
+
 
 def download_requirements() -> None:
     filename = (
@@ -1048,10 +1059,12 @@ def download_requirements() -> None:
             file,
         )
 
+
 try:
     download_requirements()
+    sys_path.append(getcwd())
     from TerminalMessagesInterface import messagef
-except:
+except ImportError:
     format_output: bool = False
 else:
     format_output: bool = True
@@ -1229,7 +1242,9 @@ class UrlReport:
     This class implements all attributes to generate an URL report.
     """
 
-    def __init__(self, path: str = None, requested: bool = True, status: int = 200):
+    def __init__(
+        self, path: str = None, requested: bool = True, status: int = 200
+    ):
         self.filepath: str = path
         self.requested: bool = requested
         self.status: int = status
@@ -1263,7 +1278,6 @@ reports: Dict[str, UrlReport] = defaultdict(UrlReport)
 
 @dataclass
 class HttpResponse:
-
     """
     This class is used with selenium to have same api as HTTPResponse.
     """
@@ -1272,7 +1286,16 @@ class HttpResponse:
     url: str
     headers: List[Tuple[str, str]]
     response: bytes
+    report: UrlReport
     readed: bool = False
+
+    @property
+    def status(self) -> int:
+        return self.code
+
+    @property
+    def data(self) -> bytes:
+        return self.response
 
     def read(self) -> bytes:
         return self.response
@@ -1295,7 +1318,6 @@ class HttpResponse:
 
 
 class ContentTypeError(ValueError):
-
     """
     Exception raised when the Content-Type
     is not valid for web page.
@@ -1305,7 +1327,6 @@ class ContentTypeError(ValueError):
 
 
 class CriticalUrllibError(Exception):
-
     """
     Exception raised after urllib exception
     when is critical.
@@ -1315,7 +1336,6 @@ class CriticalUrllibError(Exception):
 
 
 class UrlGetter(HTMLParser):
-
     """
     This class analyzes HTML web page to found URLs.
     """
@@ -1397,7 +1417,6 @@ class UrlGetter(HTMLParser):
 
 
 class _Crawler(ABC):
-
     """
     This class crawls a web page to get URLs and resources paths.
     """
@@ -1416,6 +1435,7 @@ class _Crawler(ABC):
         context: SSLContext = create_default_context(),
         interval: float = 0,
         download_policy: str = None,
+        no_query_page: bool = False,
     ):
         self.counter = 0
         self.robots = robots
@@ -1429,7 +1449,8 @@ class _Crawler(ABC):
         self.max_request = max_request
         self.crossdomain = crossdomain
         self.only_domain = only_domain
-        self.urls_parsed: List[str] = []
+        self.urls_parsed: Set[str] = set()
+        self.no_query_page = no_query_page
         self.download_policy = download_policy
         urls_to_parse = self.urls_to_parse = {url}
         self.master_url: ParseResult = urlparse(url)
@@ -1448,8 +1469,13 @@ class _Crawler(ABC):
             self.urls_getted.add(url)
             return None
 
-        if request and url not in self.urls_getted:
+        url1 = parsed_url._replace(fragment="")
+        url2 = url1._replace(query="")
+        identifier_url = (url2 if self.no_query_page else url1).geturl()
+
+        if request and identifier_url not in self.urls_parsed:
             self.urls_to_parse.add(url)
+            self.urls_parsed.add(identifier_url)
 
         self.urls_getted.add(url)
 
@@ -1494,7 +1520,9 @@ class _Crawler(ABC):
         This method calls handle method.
         """
 
-        if type_ == "resource" or any(parsed_url.path.endswith(x) for x in extensions):
+        if type_ == "resource" or any(
+            parsed_url.path.endswith(x) for x in extensions
+        ):
             handle = self.handle_resource
             request = self.download_policy == "resources"
         elif type_ == "html":
@@ -1724,9 +1752,10 @@ class _Crawler(ABC):
         """
 
         url = urls.pop()
-        urls_done.append(url)
+        urls_done.add(url)
 
         parsed_url = urlparse(url)
+
         response, url_ = self.get_data(parsed_url, first)
         if response is None or response.status != 200 and not first:
             if url_ == "break":
@@ -1861,9 +1890,11 @@ class _Crawler(ABC):
         url = ParseResult(
             self.master_url.scheme,
             self.master_url.netloc,
-            (self.master_url.path + url.path)
-            if self.master_url.path and self.master_url.path[-1] == "/"
-            else (self.master_url.path + "/" + url.path),
+            (
+                (self.master_url.path + url.path)
+                if self.master_url.path and self.master_url.path[-1] == "/"
+                else (self.master_url.path + "/" + url.path)
+            ),
             url.params,
             url.query,
             url.fragment,
@@ -1932,7 +1963,7 @@ class _Crawler(ABC):
         error, writed = self.write_response(url, error, report)
         report.status = error.status
 
-        if writed:
+        if writed or not self.store:
             return None
 
         path = join(
@@ -1955,7 +1986,11 @@ class _Crawler(ABC):
         report = UrlReport(filepath)
 
         if not self.update and exists(filepath):
-            info("Do not request " + url + " response is write by previous crawls")
+            info(
+                "Do not request "
+                + url
+                + " response is write by previous crawls"
+            )
             report.requested = False
             url = filepath
         else:
@@ -1985,7 +2020,7 @@ class _Crawler(ABC):
         else:
             if not first:
                 sleep(self.interval)
-    
+
             try:
                 response = urlopen(Request(url, headers=self.headers))
             except (URLError, HTTPError) as error_:
@@ -1998,10 +2033,23 @@ class _Crawler(ABC):
 
         self.write_response(url_parsed, response, report)
         info("Get resources from this URL: " + url)
+        log(21, url)
         return response, url
 
     if selenium:
         _get_data = get_data
+
+        def add_cookies(self) -> None:
+            """
+            This method adds cookie to selenium web driver.
+            """
+
+            if cookies_string := self.headers.get("Cookie"):
+                cookies = SimpleCookie()
+                cookies.load(cookies_string)
+
+                for key, value in cookies.items():
+                    driver.add_cookie({"name": key, "value": value})
 
         def get_data(
             self, url: ParseResult, first: bool
@@ -2011,7 +2059,7 @@ class _Crawler(ABC):
             using selenium.
             """
 
-            response = self._get_data(url, first)
+            response, _ = self._get_data(url, first)
             url, _ = self.get_complete_url(url)
 
             driver.get(url)
@@ -2031,14 +2079,41 @@ class _Crawler(ABC):
                     url,
                     response.getheaders(),
                     driver.page_source.encode(),
+                    response.report,
                 ),
                 url,
             )
 
 
+class _CrawlerPrinter(_Crawler):
+    """
+    ABC class for printers.
+    """
+
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        self.printed: Set[str] = set()
+
+    def should_print(self, url: str) -> Union[bool, None]:
+        """
+        This method prints the URL found.
+        """
+
+        parsed_url = urlparse(url)
+        url1 = parsed_url._replace(fragment="")
+        url2 = url1._replace(query="")
+        identifier_url = (url2 if self.no_query_page else url1).geturl()
+
+        if identifier_url in self.printed:
+            return False
+
+        self.printed.add(identifier_url)
+        return True
+
+
 if format_output:
 
-    class CrawlerColoredPrinter(_Crawler):
+    class CrawlerColoredPrinter(_CrawlerPrinter):
         """
         This class prints all URLs.
         """
@@ -2048,15 +2123,17 @@ if format_output:
             This function returns the pourcents of URL requested.
             """
 
-            divid = self.max_request or len(self.urls_to_parse)
+            divid = self.max_request or (
+                len(self.urls_to_parse) + len(self.urls_parsed)
+            )
             if divid == 0:
                 return 0
 
             pourcent = round(self.counter / divid * 100)
-            
+
             if pourcent == 100:
                 return 99
-            
+
             return pourcent
 
         def handle_web_page(
@@ -2066,6 +2143,12 @@ if format_output:
             This method prints the URL found.
             """
 
+            if not self.should_print(url):
+                messagef(
+                    from_url, "OK", self.get_pourcent(), oneline_progress=True
+                )
+                return None
+
             messagef(f"[{tag}<{attribute}>] {url}", "OK", self.get_pourcent())
 
         def handle_static(
@@ -2074,6 +2157,15 @@ if format_output:
             """
             This method prints the URL found.
             """
+
+            if not self.should_print(url):
+                messagef(
+                    from_url,
+                    "INFO",
+                    self.get_pourcent(),
+                    oneline_progress=True,
+                )
+                return None
 
             messagef(
                 f"[{tag}<{attribute}>] {url}", "INFO", self.get_pourcent()
@@ -2086,12 +2178,21 @@ if format_output:
             This method prints the URL found.
             """
 
+            if not self.should_print(url):
+                messagef(
+                    from_url,
+                    "TODO",
+                    self.get_pourcent(),
+                    oneline_progress=True,
+                )
+                return None
+
             messagef(
                 f"[{tag}<{attribute}>] {url}", "TODO", self.get_pourcent()
             )
 
 
-class CrawlerRawPrinter(_Crawler):
+class CrawlerRawPrinter(_CrawlerPrinter):
     """
     This class prints all URLs.
     """
@@ -2102,6 +2203,9 @@ class CrawlerRawPrinter(_Crawler):
         """
         This method prints the URL found.
         """
+
+        if not self.should_print(url):
+            return None
 
         print("[+]", tag, attribute, url)
 
@@ -2112,6 +2216,9 @@ class CrawlerRawPrinter(_Crawler):
         This method prints the URL found.
         """
 
+        if not self.should_print(url):
+            return None
+
         print("[*]", tag, attribute, url)
 
     def handle_resource(
@@ -2121,10 +2228,13 @@ class CrawlerRawPrinter(_Crawler):
         This method prints the URL found.
         """
 
+        if not self.should_print(url):
+            return None
+
         print("[#]", tag, attribute, url)
 
 
-class CrawlerRawUrlOnlyPrinter(_Crawler):
+class CrawlerRawUrlOnlyPrinter(_CrawlerPrinter):
     """
     This class prints all URLs.
     """
@@ -2136,6 +2246,9 @@ class CrawlerRawUrlOnlyPrinter(_Crawler):
         This method prints the URL found.
         """
 
+        if not self.should_print(url):
+            return None
+
         print(url)
 
     def handle_static(
@@ -2145,6 +2258,9 @@ class CrawlerRawUrlOnlyPrinter(_Crawler):
         This method prints the URL found.
         """
 
+        if not self.should_print(url):
+            return None
+
         print(url)
 
     def handle_resource(
@@ -2153,6 +2269,9 @@ class CrawlerRawUrlOnlyPrinter(_Crawler):
         """
         This method prints the URL found.
         """
+
+        if not self.should_print(url):
+            return None
 
         print(url)
 
@@ -2224,7 +2343,7 @@ def parse_args() -> Namespace:
         default=False,
         action="store_true",
         help=(
-            "Do not request only the base URL" " domain (request all domains)."
+            "Do not request only the base URL domain (request all domains)."
         ),
     )
     add(
@@ -2238,7 +2357,7 @@ def parse_args() -> Namespace:
         "-c",
         nargs="+",
         action="extend",
-        help="Add a cookie.",
+        help="Add cookies.",
     )
     add(
         "--headers",
@@ -2268,9 +2387,9 @@ def parse_args() -> Namespace:
     add(
         "--loglevel",
         "-L",
-        help="WebSiteCloner logs level.",
+        help="WebCrawler logs level.",
         default="WARNING",
-        choices={"DEBUG", "INFO", "WARNING", "ERROR", "CRITICAL"},
+        choices=["DEBUG", "INFO", "REQUEST", "WARNING", "ERROR", "CRITICAL"],
     )
     add(
         "--logfile",
@@ -2290,10 +2409,23 @@ def parse_args() -> Namespace:
         "--format",
         "-f",
         default="colored" if format_output else "raw",
-        choices={"raw", "raw-url-only", "colored"}
-        if format_output
-        else {"raw", "raw-url-only", "colored"},
+        choices=(
+            {"raw", "raw-url-only", "colored"}
+            if format_output
+            else {"raw", "raw-url-only", "colored"}
+        ),
         help="Output format.",
+    )
+    add(
+        "--no-query-page",
+        "--no-query",
+        "-q",
+        default=False,
+        action="store_true",
+        help=(
+            "Request only when path is different, without this option the same"
+            " path will be requested for each differents queries."
+        ),
     )
 
     if selenium:
@@ -2413,6 +2545,7 @@ def main() -> int:
 
     arguments = parse_args()
 
+    addLevelName(21, "REQUEST")
     basicConfig(
         format="[%(asctime)s] %(levelname)s (%(levelno)d): %(message)s",
         datefmt="%Y-%d-%m %H:%M:%S",
@@ -2439,6 +2572,7 @@ def main() -> int:
         if cookies:
             cookies += ";"
         cookies += ";".join(arguments.cookies)
+        headers["Cookie"] = cookies
 
     context = create_default_context()
     if selenium:
@@ -2470,6 +2604,7 @@ def main() -> int:
         context=context,
         interval=arguments.interval_request,
         download_policy=get_download_policy(arguments),
+        no_query_page=arguments.no_query_page,
     )
 
     try:
@@ -2477,7 +2612,7 @@ def main() -> int:
     except (ContentTypeError, CriticalUrllibError):
         print(
             "Critical exception on the first request"
-            ", there is nothing to cr0wl....",
+            ", there is nothing to crawl....",
             file=stderr,
         )
         critical("Critical exception on the first request.")
