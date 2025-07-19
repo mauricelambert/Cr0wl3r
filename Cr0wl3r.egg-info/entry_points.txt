@@ -1,2 +1,0 @@
-[console_scripts]
-Cr0wl3r = Cr0wl3r:main
