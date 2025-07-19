@@ -4,7 +4,7 @@
 ###################
 #    This module implements a crawler to find all links and resources
 #    on the target web site.
-#    Copyright (C) 2023, 2024  Maurice Lambert
+#    Copyright (C) 2023, 2024, 2025  Maurice Lambert
 
 #    This program is free software: you can redistribute it and/or modify
 #    it under the terms of the GNU General Public License as published by
@@ -967,7 +967,7 @@ on the target web site.
 ~# 
 """
 
-__version__ = "1.1.0"
+__version__ = "1.1.1"
 __author__ = "Maurice Lambert"
 __author_email__ = "mauricelambert434@gmail.com"
 __maintainer__ = "Maurice Lambert"
@@ -980,7 +980,7 @@ license = "GPL-3.0 License"
 __url__ = "https://github.com/mauricelambert/Cr0wl3r"
 
 copyright = """
-Cr0wl3r  Copyright (C) 2023, 2024  Maurice Lambert
+Cr0wl3r  Copyright (C) 2023, 2024, 2025  Maurice Lambert
 This program comes with ABSOLUTELY NO WARRANTY.
 This is free software, and you are welcome to redistribute it
 under certain conditions.
@@ -997,8 +997,6 @@ __all__ = [
     "CriticalUrllibError",
     "ContentTypeError",
 ]
-
-print(copyright)
 
 from logging import (
     basicConfig,
@@ -1340,11 +1338,12 @@ class UrlGetter(HTMLParser):
     This class analyzes HTML web page to found URLs.
     """
 
-    def __init__(self, url: str, report: UrlReport, crawler: _Crawler):
+    def __init__(self, url: str, url_parsed: ParseResult, report: UrlReport, crawler: _Crawler):
         super().__init__()
         self.url = url
         self.report = report
         self.crawler = crawler
+        self.url_parsed = url_parsed
 
     def add_interactive_tag(
         self, tag: str, attributes: List[Tuple[str, str]]
@@ -1377,7 +1376,7 @@ class UrlGetter(HTMLParser):
             and not value.strip().startswith("javascript:")
         ):
             info("Get new URL: " + value)
-            url, parsed_url = self.crawler.get_complete_url(urlparse(value))
+            url, parsed_url = self.crawler.get_complete_url(urlparse(value), self.url_parsed)
 
             self.crawler._handle(
                 self.url,
@@ -1776,7 +1775,7 @@ class _Crawler(ABC):
         return response, parsed_url, url_ or url
 
     def read_and_parse(
-        self, response: HTTPResponse, url: str, first: bool
+        self, response: HTTPResponse, url: str, first: bool, url_parsed: ParseResult
     ) -> None:
         """
         This method reads the response and parses it.
@@ -1787,7 +1786,7 @@ class _Crawler(ABC):
         )
 
         if is_html:
-            UrlGetter(url, response.report, self).feed(
+            UrlGetter(url, url_parsed, response.report, self).feed(
                 self.decode(response.data)
             )
             first = False
@@ -1813,7 +1812,7 @@ class _Crawler(ABC):
             urls, urls_done, first
         )
 
-        self.read_and_parse(response, url, False)
+        self.read_and_parse(response, url, False, parsed_url)
 
         return parsed_url
 
@@ -1859,15 +1858,17 @@ class _Crawler(ABC):
         ):
             self.urls_to_parse.append(url_parsed.path)
 
-    def get_complete_url(self, url: ParseResult) -> Tuple[str, ParseResult]:
+    def get_complete_url(self, url: ParseResult, from_url: ParseResult = None) -> Tuple[str, ParseResult]:
         """
         This function build a complete url.
         """
 
+        from_url = from_url or self.master_url
+
         if url.netloc:
             if not url.scheme:
                 url = ParseResult(
-                    self.master_url.scheme,
+                    from_url.scheme,
                     url.netloc,
                     url.path,
                     url.params,
@@ -1878,8 +1879,8 @@ class _Crawler(ABC):
 
         if url.path and url.path[0] == "/":
             url = ParseResult(
-                self.master_url.scheme,
-                self.master_url.netloc,
+                from_url.scheme,
+                from_url.netloc,
                 url.path,
                 url.params,
                 url.query,
@@ -1888,12 +1889,12 @@ class _Crawler(ABC):
             return url.geturl(), url
 
         url = ParseResult(
-            self.master_url.scheme,
-            self.master_url.netloc,
+            from_url.scheme,
+            from_url.netloc,
             (
-                (self.master_url.path + url.path)
-                if self.master_url.path and self.master_url.path[-1] == "/"
-                else (self.master_url.path + "/" + url.path)
+                (from_url.path + url.path)
+                if from_url.path and from_url.path[-1] == "/"
+                else (from_url.path + "/" + url.path)
             ),
             url.params,
             url.query,
@@ -2022,7 +2023,7 @@ class _Crawler(ABC):
                 sleep(self.interval)
 
             try:
-                response = urlopen(Request(url, headers=self.headers))
+                response = urlopen(Request("".join([chr(x) if 32 <= x <= 126 else f"%{x:0>2X}" for x in url.encode()]), headers=self.headers), context=self.context)
             except (URLError, HTTPError) as error_:
                 if getattr(error_, "code", None):
                     warning(f"HTTP {error_.code} error in " + url)
@@ -2543,6 +2544,7 @@ def main() -> int:
     This function starts the script from the command line.
     """
 
+    print(copyright)
     arguments = parse_args()
 
     addLevelName(21, "REQUEST")

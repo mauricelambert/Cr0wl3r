@@ -21,8 +21,36 @@ Optional:
 
 ## Installation
 
+### Pip
+
 ```bash
 pip install Cr0wl3r 
+```
+
+### Git
+
+```bash
+git clone "https://github.com/mauricelambert/Cr0wl3r.git"
+cd "Cr0wl3r"
+python3 -m pip install .
+```
+
+### Wget
+
+```bash
+wget https://github.com/mauricelambert/Cr0wl3r/archive/refs/heads/main.zip
+unzip main.zip
+cd Cr0wl3r-main
+python3 -m pip install .
+```
+
+### cURL
+
+```bash
+curl -O https://github.com/mauricelambert/Cr0wl3r/archive/refs/heads/main.zip
+unzip main.zip
+cd Cr0wl3r-main
+python3 -m pip install .
 ```
 
 ## Usages
@@ -44,7 +72,7 @@ Cr0wl3r -F report.json -L DEBUG -l logs.log -R -S -d -c "mycookie=foobar" -H "Us
 Cr0wl3r -R -S -C -d -u -i -F report.json -L DEBUG -l logs.log -c "mycookie=foobar" "session=abc" -c "counter=5" -H "User-Agent:Chrome" "Api-Key:myapikey" -H "Authorization:Basic QWxhZGRpbjpvcGVuIHNlc2FtZQ==" -m 5 -t "p" "img" -t "link" -I 3.5 -f "raw-url-only" -D4 "text/html" -q -r https://github.com/mauricelambert
 ```
 
-### Python3
+### Python script
 
 ```python
 from Cr0wl3r import CrawlerRawPrinter
